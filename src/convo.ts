@@ -31,12 +31,12 @@ export class ConversationManager {
     return messages.toReversed();
   }
 
-  // TODO:
+  // TODO
   deleteMessage(id: string) {
     this.messages.delete(id);
     this.cleanupOrphans();
   }
 
-  // TODO: delete all conversations that don't begin with a startOfThread
+  // TODO
   cleanupOrphans() {}
 }

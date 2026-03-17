@@ -29,11 +29,9 @@ export class AIService {
 
   async generateText({
     messages,
-    model,
     context,
   }: {
     messages: ConversationMessage[];
-    model?: string;
     context: {
       botUsername: string;
       serverName: string;
@@ -42,15 +40,16 @@ export class AIService {
     };
   }): Promise<{
     text: string;
-    toolCalls?: Array<{name: string; input: unknown}>;
+    toolCalls?: {name: string; input: unknown}[];
   }> {
-    const modelName = model || config.models.default;
+    const modelName = config.model.name;
 
     const systemPrompt = this.systemPrompt
       .replaceAll('{{BOT_USERNAME}}', context.botUsername)
       .replaceAll('{{SERVER_NAME}}', context.serverName)
       .replaceAll('{{CHANNEL_NAME}}', context.channelName)
-      .replaceAll('{{CHANNEL_DESCRIPTION}}', context.channelDescription);
+      .replaceAll('{{CHANNEL_DESCRIPTION}}', context.channelDescription)
+      .replaceAll('{{MODEL}}', modelName);
 
     const result = await generateText({
       model: this.ollama(modelName),

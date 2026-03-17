@@ -1,3 +1,5 @@
+import {clearInterval, setInterval} from 'node:timers';
+
 import {ChannelType, type TextChannel} from 'discord.js';
 
 import {AIService} from './ai';
@@ -54,7 +56,12 @@ discord.on('messageCreate', async msg => {
     });
   }
   const convo = cm.getConversation(msg.id);
-  console.log(convo);
+
+  msg.channel.sendTyping();
+  const typingInterval = setInterval(
+    () => msg.channel.sendTyping(),
+    1_000 * 10
+  );
 
   const response = await ai.generateText({
     messages: convo,
@@ -65,6 +72,8 @@ discord.on('messageCreate', async msg => {
       channelDescription: (msg.channel as TextChannel).topic || '',
     },
   });
+
+  clearInterval(typingInterval);
 
   const sent = await msg.reply({
     content: response.text,

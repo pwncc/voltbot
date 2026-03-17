@@ -3,18 +3,9 @@ import {readFileSync} from 'node:fs';
 
 import {parse} from 'toml';
 
-export type ModelsConfig = {
-  /** the default model is used for @ping responses. the rest are available in /ask */
-  default: string;
-  models: ModelConfig[];
-  maxHistory: number;
-};
-
 export type ModelConfig = {
   name: string;
-  desc: string;
-  tags: string[];
-  maxHistory?: number;
+  max_history?: number;
 };
 
 export type OpenAIConfig = {
@@ -27,15 +18,10 @@ export type DiscordConfig = {
   token: string;
 };
 
-export type ConversationConfig = {
-  timeoutMinutes: number;
-};
-
 export type Config = {
   discord: DiscordConfig;
   openai: OpenAIConfig;
-  models: ModelsConfig;
-  conversation?: ConversationConfig;
+  model: ModelConfig;
 };
 
 export let config: Config;
@@ -52,14 +38,8 @@ export const loadConfig = (path = 'config.toml') => {
     config.openai.api_key = ':3';
   }
 
-  if (!config.models.maxHistory) {
-    config.models.maxHistory = 30;
-  }
-
-  for (const model of config.models.models) {
-    if (!model.maxHistory) {
-      model.maxHistory = config.models.maxHistory || 30;
-    }
+  if (!config.model.max_history) {
+    config.model.max_history = 30;
   }
 
   return config;
