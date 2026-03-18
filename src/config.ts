@@ -6,9 +6,10 @@ import {parse} from 'toml';
 export type ModelConfig = {
   name: string;
   max_history?: number;
+  max_output?: number;
 };
 
-export type OpenAIConfig = {
+export type ProviderConfig = {
   base_url: string;
   api_key: string;
   system_prompt: string;
@@ -21,7 +22,7 @@ export type DiscordConfig = {
 
 export type Config = {
   discord: DiscordConfig;
-  openai: OpenAIConfig;
+  provider: ProviderConfig;
   model: ModelConfig;
 };
 
@@ -32,15 +33,15 @@ export const loadConfig = (path = 'config.toml') => {
   config = parse(configFile);
 
   assert(config.discord.token, 'missing discord.token');
-  assert(config.openai?.base_url, 'missing openai.base_url');
+  assert(config.provider?.base_url, 'missing provider.base_url');
 
   // ollama doesn't need an api key so any string works
-  if (!config.openai.api_key) {
-    config.openai.api_key = ':3';
+  if (!config.provider.api_key) {
+    config.provider.api_key = ':3';
   }
 
   if (!config.model.max_history) {
-    config.model.max_history = 30;
+    config.model.max_history = 0;
   }
 
   if (!config.discord.enabled_guilds) {

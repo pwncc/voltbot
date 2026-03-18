@@ -1,30 +1,31 @@
-import {createOpenAI} from '@ai-sdk/openai';
 import {generateText, stepCountIs} from 'ai';
 import {createOllama} from 'ai-sdk-ollama';
 
 import {config} from './config';
 import type {ConversationMessage} from './convo';
 import {webSearch} from './tools/webSearch';
+import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 
 export type Role = 'user' | 'assistant' | 'system';
 
 export class AIService {
-  private openai: ReturnType<typeof createOpenAI>;
+  private openrouter: ReturnType<typeof createOpenRouter>;
   private ollama: ReturnType<typeof createOllama>;
+
+  private isLocal = config.provider.base_url.includes('localhost');
 
   readonly systemPrompt: string;
 
   constructor() {
-    this.openai = createOpenAI({
-      baseURL: `${config.openai.base_url}/v1`,
-      apiKey: config.openai.api_key,
-    });
+    this.openrouter = createOpenRouter({
+      apiKey: config.provider.api_key,
+    })
 
     this.ollama = createOllama({
-      baseURL: config.openai.base_url,
+      baseURL: config.provider.base_url,
     });
 
-    this.systemPrompt = config.openai.system_prompt;
+    this.systemPrompt = config.provider.system_prompt;
   }
 
   async generateText({
@@ -38,10 +39,11 @@ export class AIService {
       channelName: string;
       channelDescription: string;
     };
-  }): Promise<{
-    text: string;
-    toolCalls?: {name: string; input: unknown}[];
-  }> {
+    }) {
+  // }): Promise<{
+  //   text: string;
+  //   toolCalls?: {name: string; input: unknown}[];
+  // }> {
     const modelName = config.model.name;
 
     const systemPrompt = this.systemPrompt
@@ -52,9 +54,10 @@ export class AIService {
       .replaceAll('{{MODEL}}', modelName);
 
     const result = await generateText({
-      model: this.ollama(modelName),
+      model: (this.isLocal ? this.ollama : this.openrouter)(modelName, {}),
       system: systemPrompt,
-      messages: messages,
+      messages: messages.slice(-config.model.max_history!),
+      maxOutputTokens: config.model.max_output,
       tools: {
         search_web: webSearch,
       },
@@ -71,6 +74,11 @@ export class AIService {
     return {
       text: result.text || 'Failed :(',
       toolCalls,
+      usage: {
+        outputTokens: result.totalUsage.outputTokens,
+        inputTokens: result.totalUsage.inputTokens,
+        cost: result.steps.map(s => 'cost' in s.usage && typeof s.usage.cost === 'number' ? s.usage.cost : 0).reduce((a, c) => a + c, 0),
+      }
     };
   }
 }

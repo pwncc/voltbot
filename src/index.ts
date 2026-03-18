@@ -37,6 +37,7 @@ discord.on('threadCreate', async thread => {
 
   const isParentInConvo = cm.messages.has(startingMessage.id);
   if (isParentInConvo) {
+    console.log('isParentInConvo');
     cm.attachThread(thread.id, startingMessage.id);
   }
 });
@@ -63,6 +64,7 @@ discord.on('messageCreate', async msg => {
   }
 
   if (isPing && isFirstInThread) {
+    console.log('isPing and isFirst');
     cm.attachThread(threadId!, msg.id);
   }
 
@@ -100,33 +102,40 @@ discord.on('messageCreate', async msg => {
     1_000 * 10
   );
 
-  const response = await ai.generateText({
-    messages: convo,
-    context: {
-      botUsername: discord.user!.username,
-      serverName: msg.guild!.name,
-      channelName: msg.channel.parent?.name || msg.channel.name,
-      channelDescription: (msg.channel as TextChannel).topic || '<none>',
-    },
-  });
+  try {
+    const response = await ai.generateText({
+      messages: convo,
+      context: {
+        botUsername: discord.user!.username,
+        serverName: msg.guild!.name,
+        channelName: msg.channel.parent?.name || msg.channel.name,
+        channelDescription: (msg.channel as TextChannel).topic || '<none>',
+      },
+    });
 
-  clearInterval(typingInterval);
+    console.log(response.usage);
 
-  const sent = await msg.reply({
-    content: response.text,
-    allowedMentions: {},
-  });
+    const sent = await msg.reply({
+      content: response.text,
+      allowedMentions: {},
+    });
 
-  cm.addMessage({
-    content: response.text,
-    author: sent.author.username,
-    authorID: sent.author.id,
-    messageID: sent.id,
-    role: 'assistant',
-    startOfThread: false,
-    parent: msg.id,
-    threadID: msg.channel.isThread() ? msg.channel.id : undefined,
-  });
+    cm.addMessage({
+      content: response.text,
+      author: sent.author.username,
+      authorID: sent.author.id,
+      messageID: sent.id,
+      role: 'assistant',
+      startOfThread: false,
+      parent: msg.id,
+      threadID: msg.channel.isThread() ? msg.channel.id : undefined,
+    });
+  } catch (err) {
+    console.error(err);
+    msg.channel.send(':x: An error occurred.');
+  } finally {
+    clearInterval(typingInterval);
+  }
 });
 
 discord.on('messageDelete', msg => {
