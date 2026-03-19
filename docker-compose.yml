@@ -7,12 +7,3 @@ services:
     volumes:
       - ./docker/searxng/config:/etc/searxng
       - ./docker/searxng/data:/var/cache/searxng
-
-  mcp-searxng:
-    image: isokoliuk/mcp-searxng:latest
-    restart: always
-    stdin_open: true
-    environment:
-      SEARXNG_URL: http://searxng:8080
-    depends_on:
-      - searxng
