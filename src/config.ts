@@ -5,6 +5,7 @@ import {parse} from 'toml';
 
 export type ModelConfig = {
   name: string;
+  provider?: string[];
   max_history?: number;
   max_output?: number;
   small_model?: string;
@@ -25,11 +26,16 @@ export type SearXNGConfig = {
   url: string;
 };
 
+export type SQLiteConfig = {
+  path: string;
+};
+
 export type Config = {
   discord: DiscordConfig;
   provider: ProviderConfig;
   model: ModelConfig;
   searxng: SearXNGConfig;
+  sqlite: SQLiteConfig;
 };
 
 export let config: Config;
@@ -52,6 +58,10 @@ export const loadConfig = (path = 'config.toml') => {
 
   if (!config.discord.enabled_guilds) {
     config.discord.enabled_guilds = [];
+  }
+
+  if (!config.sqlite.path) {
+    config.sqlite.path = ':memory:';
   }
 
   return config;

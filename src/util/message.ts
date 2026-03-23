@@ -182,6 +182,7 @@ export const sendMessage = async ({
     reasoning: number;
     cached: number;
     total: number;
+    cost: number;
   };
 }): Promise<SendMessageResult> => {
   const {blocks, prose} = parseCodeBlocks(response, CODE_FILE_THRESHOLD);
@@ -228,7 +229,7 @@ export const sendMessage = async ({
     const msgContent =
       messagesToSend[i] +
       (isLast
-        ? `\n\n-# input: ${usage.in} tokens (${usage.in - usage.cached} uncached, ${usage.cached} cached), output: ${usage.out}`
+        ? `\n\n-# input: ${usage.in} tokens (${usage.in - usage.cached} uncached, ${usage.cached} cached), output: ${usage.out}. cost: $${usage.cost}`
         : '');
 
     const msgOptions: MessageCreateOptions = {

@@ -8,6 +8,7 @@ import {
 import {createOllama} from 'ai-sdk-ollama';
 
 import {config} from './config';
+import type {DBMessage} from './db';
 import {currentTime} from './tools/time';
 import {webSearch} from './tools/webSearch';
 
@@ -29,6 +30,17 @@ export class AIService {
   constructor() {
     this.openrouter = createOpenRouter({
       apiKey: config.provider.api_key,
+      extraBody: {
+        provider: config.model.provider?.length
+          ? {
+              order: config.model.provider,
+              allow_fallbacks: false,
+            }
+          : undefined,
+        reasoning: {
+          max_tokens: 1_000,
+        },
+      },
     });
 
     this.ollama = createOllama({
@@ -42,7 +54,7 @@ export class AIService {
     messages,
     context,
   }: {
-    messages: ModelMessage[];
+    messages: DBMessage[];
     context: {
       botUsername: string;
       serverName: string;
@@ -71,16 +83,35 @@ export class AIService {
       ].join('\n'),
     };
 
+    const convo: ModelMessage[] = messages
+      .slice(-config.model.max_history!)
+      .map(
+        (m, i, a) =>
+          <ModelMessage>{
+            role: m.role,
+            content: [
+              m.image_url &&
+                i >= a.length - 4 && {
+                  type: 'image',
+                  image: new URL(m.image_url),
+                },
+
+              m.content && {
+                type: 'text',
+                text: m.content,
+              },
+            ].filter(Boolean),
+          }
+      );
+
     const result = await generateText({
-      model: (this.isLocal ? this.ollama : this.openrouter)(modelName, {}),
+      model: (this.isLocal ? this.ollama : this.openrouter)(modelName),
       system: systemPrompt,
-      messages: [contextPrompt, ...messages.slice(-config.model.max_history!)],
+      messages: [contextPrompt, ...convo],
       maxOutputTokens: config.model.max_output,
       tools: TOOLS,
       stopWhen: stepCountIs(3),
     });
-
-    console.dir(result, {depth: null});
 
     const toolCalls = result.toolCalls?.map(call => ({
       name: call.toolName,
@@ -101,6 +132,9 @@ export class AIService {
         reasoning: result.totalUsage.outputTokenDetails.reasoningTokens || 0,
         cached: result.totalUsage.inputTokenDetails.cacheReadTokens || 0,
         total: result.totalUsage.totalTokens || 0,
+        cost:
+          (result?.providerMetadata?.openrouter?.usage as {cost?: number})
+            ?.cost || 0,
       },
     };
   }
