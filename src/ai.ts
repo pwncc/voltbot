@@ -83,17 +83,18 @@ export class AIService {
       ].join('\n'),
     };
 
-    const convo: ModelMessage[] = messages
-      .slice(-config.model.max_history!)
-      .map(
-        (m, i, a) =>
+    const convo: ModelMessage[] = await Promise.all(
+      messages.slice(-config.model.max_history!).map(
+        async (m, i, a) =>
           <ModelMessage>{
             role: m.role,
             content: [
               m.image_url &&
                 i >= a.length - 8 && {
                   type: 'image',
-                  image: new URL(m.image_url),
+                  image: this.isLocal
+                    ? await fetch(m.image_url).then(r => r.arrayBuffer())
+                    : new URL(m.image_url),
                 },
 
               m.content && {
@@ -106,7 +107,8 @@ export class AIService {
               },
             ].filter(Boolean),
           }
-      );
+      )
+    );
 
     const result = await generateText({
       model: (this.isLocal ? this.ollama : this.openrouter)(modelName),
@@ -148,20 +150,25 @@ export class AIService {
 
     const titlePrompt = `Generate a short, descriptive title for this conversation. Max 100 characters. No quotes. Just the title.`;
 
-    const result = await generateText({
-      model: (this.isLocal ? this.ollama : this.openrouter)(modelName, {}),
-      system: titlePrompt,
-      messages: messages.slice(-10),
-      maxOutputTokens: 20,
-      providerOptions: {
-        openrouter: {
-          reasoning: {
-            enabled: false,
+    try {
+      const result = await generateText({
+        model: (this.isLocal ? this.ollama : this.openrouter)(modelName, {}),
+        system: titlePrompt,
+        messages: messages.slice(-10),
+        maxOutputTokens: 20,
+        providerOptions: {
+          openrouter: {
+            reasoning: {
+              enabled: false,
+            },
           },
         },
-      },
-    });
+      });
 
-    return result.text.slice(0, 100).trim() || 'AI Response';
+      return result.text.slice(0, 100).trim() || 'AI Response';
+    } catch (err) {
+      console.error('Failed to generate thread title:', err);
+      return 'AI Response';
+    }
   }
 }

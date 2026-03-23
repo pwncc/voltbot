@@ -23,7 +23,7 @@ type CodeBlock = {
 
 const CODE_BLOCK_REGEX = /```(\w*)\n?([\s\S]*?)```/g;
 const SENTENCE_END_REGEX = /([.!?。]+[\s\n]+)/g;
-const MAX_MESSAGE_LENGTH = 2000;
+const MAX_MESSAGE_LENGTH = 1_800;
 const CODE_FILE_THRESHOLD = 800;
 
 const getFileExtension = (language: string): string => {
@@ -235,7 +235,7 @@ export const sendMessage = async ({
     const msgOptions: MessageCreateOptions = {
       content: msgContent,
       flags: MessageFlags.SuppressEmbeds,
-      allowedMentions: {parse: []},
+      allowedMentions: {parse: ['users'], repliedUser: true},
       ...(hasFiles ? {files} : {}),
     };
 
@@ -248,7 +248,8 @@ export const sendMessage = async ({
 
     // HACK: it adds this to the Conversation so we have to take out the token stats line
     if (isLast) {
-      msg.content = messagesToSend[i];
+      // msg.content = messagesToSend[i];
+      msg.content = response;
     }
 
     messages.push(msg);
