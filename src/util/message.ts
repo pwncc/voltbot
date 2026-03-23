@@ -235,6 +235,7 @@ export const sendMessage = async ({
     const msgOptions: MessageCreateOptions = {
       content: msgContent,
       flags: MessageFlags.SuppressEmbeds,
+      allowedMentions: {parse: []},
       ...(hasFiles ? {files} : {}),
     };
 
