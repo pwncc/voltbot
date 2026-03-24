@@ -114,7 +114,7 @@ discord.on('messageCreate', async msg => {
       parentId = sent.id;
     }
   } catch (err) {
-    console.error(err);
+    console.dir(err, {depth: null});
     msg.channel.send(':x: An error occurred.');
   } finally {
     clearInterval(typingInterval);
