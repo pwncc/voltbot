@@ -31,6 +31,7 @@ export class AIService {
   private isLocal = config.provider.base_url.includes('localhost');
 
   readonly systemPrompt: string;
+  sending = new Map<string, Set<AbortController>>();
 
   constructor() {
     this.openrouter = createOpenRouter({
@@ -61,6 +62,7 @@ export class AIService {
   }: {
     messages: DBMessage[];
     context: {
+      replyingToMsgID: string;
       botUsername: string;
       serverName: string;
       channelName: string;
@@ -79,7 +81,7 @@ export class AIService {
       cached: number;
       total: number;
       cost: number;
-    }
+    };
   }> {
     const convo: ModelMessage[] = await Promise.all(
       messages.slice(-config.model.max_history!).map(
@@ -135,12 +137,21 @@ export class AIService {
       ].join('\n'),
     };
 
+    const ac = new AbortController();
+    let sendingSet = this.sending.get(context.replyingToMsgID);
+    if (!sendingSet) {
+      sendingSet = new Set();
+      this.sending.set(context.replyingToMsgID, sendingSet);
+    }
+    sendingSet.add(ac);
+
     // TODO: add retry
     const result = await generateText({
       model: (this.isLocal ? this.ollama : this.openrouter)(modelName),
       system: systemPrompt,
       messages: [contextPrompt, ...convo],
       maxOutputTokens: config.model.max_output,
+      abortSignal: ac.signal,
       tools: {
         ...TOOLS,
         ...discordMessageTools(context.member),
@@ -162,6 +173,11 @@ export class AIService {
       topP: 0.93,
     });
 
+    sendingSet.delete(ac);
+    if (!sendingSet.size) {
+      this.sending.delete(context.replyingToMsgID);
+    }
+
     console.dir(result, {depth: null});
 
     const toolCalls = result.toolCalls?.map(call => ({
@@ -180,7 +196,8 @@ export class AIService {
       usage: {
         provider: this.isLocal
           ? 'ollama (local)'
-          : (result.providerMetadata?.openrouter?.provider as string || 'unknown'),
+          : (result.providerMetadata?.openrouter?.provider as string) ||
+            'unknown',
         in: result.totalUsage.inputTokens || 0,
         out: result.totalUsage.outputTokens || 0,
         reasoning: result.totalUsage.outputTokenDetails.reasoningTokens || 0,

@@ -184,6 +184,7 @@ export const sendMessage = async ({
     cached: number;
     total: number;
     cost: number;
+    provider: string;
   };
 }): Promise<SendMessageResult> => {
   const {blocks, prose} = parseCodeBlocks(response, CODE_FILE_THRESHOLD);

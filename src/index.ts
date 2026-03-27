@@ -69,6 +69,7 @@ discord.on('messageCreate', async msg => {
     const response = await ai.generateText({
       messages: convo,
       context: {
+        replyingToMsgID: msg.id,
         botUsername: discord.user!.username,
         serverName: msg.guild!.name,
         channelName: msg.channel.parent?.name || msg.channel.name,
@@ -116,9 +117,17 @@ discord.on('messageCreate', async msg => {
       parentId = sent.id;
     }
   } catch (err) {
-    // console.dir(err, {depth: null});
-    console.error(err);
-    msg.channel.send(':x: An error occurred.');
+    if (
+      err !== 'parent_message_deleted' &&
+      !(err &&
+        typeof err === 'object' &&
+        'cause' in err &&
+        err.cause === 'parent_message_deleted')
+    ) {
+      console.error(err);
+      msg.channel.send(':x: An error occurred.');
+    }
+
   } finally {
     clearInterval(typingInterval);
   }
@@ -127,6 +136,13 @@ discord.on('messageCreate', async msg => {
 discord.on('messageDelete', msg => {
   // fixme: this doesn't seem to be working properly?
   db.deleteChildren(BigInt(msg.id));
+  if (ai.sending.has(msg.id)) {
+    for (const ac of ai.sending.get(msg.id)!) {
+      ac.abort('parent_message_deleted');
+    }
+
+    ai.sending.delete(msg.id);
+  }
 });
 
 discord.login(config.discord.token);

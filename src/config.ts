@@ -75,8 +75,8 @@ export const loadConfig = (path = 'config.toml') => {
     config.sqlite.path = ':memory:';
   }
 
-  if (config.misc.debug_show_tokens === undefined) {
-    config.misc.debug_show_tokens = false;
+  if (config.misc?.debug_show_tokens === undefined) {
+    config.misc = {debug_show_tokens: false};
   }
 
   return config;
