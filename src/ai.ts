@@ -134,7 +134,18 @@ export class AIService {
         ...discordMessageTools(context.member),
         ...ragTools(context.member, context.db, this),
       },
-      stopWhen: stepCountIs(5),
+      stopWhen: [
+        stepCountIs(10),
+        ({steps}) =>
+          steps.reduce((a, c) => (c.usage.totalTokens || 0) + a, 0) > 20_000,
+        ({steps}) =>
+          steps.reduce(
+            (a, c) =>
+              ((c.providerMetadata?.openrouter?.usage as {cost?: number})
+                ?.cost || 0) + a,
+            0
+          ) > 0.01,
+      ],
       temperature: 0.9,
       topP: 0.93,
     });
