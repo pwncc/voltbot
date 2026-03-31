@@ -29,8 +29,6 @@ export const ragTools = (member: GuildMember, db: Database, ai: AIService) => ({
 
       const result = db.queryRag(queryEmbedding, BigInt(member.guild.id));
 
-      console.log('Queried RAG:', {query, result});
-
       if (!result.length) {
         return "No relevant server rules or FAQs were found for this query. Answer using general knowledge, or tell the user you don't have server-specific info on this.";
       }

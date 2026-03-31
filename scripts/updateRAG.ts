@@ -1,18 +1,20 @@
-import { readFileSync } from "node:fs";
-import { parse } from "toml";
-import { loadConfig } from "../src/config";
-import { AIService } from "../src/ai";
-import { Database } from "../src/db";
+import {readFileSync} from 'node:fs';
+
+import {parse} from 'toml';
+
+import {AIService} from '../src/ai';
+import {loadConfig} from '../src/config';
+import {Database} from '../src/db';
 
 type RAGConfig = {
   discord_guild_id: string;
-  entry: RAGEntry[]
+  entry: RAGEntry[];
 };
 
 type RAGEntry = {
   category: string;
   content: string;
-}
+};
 
 const loadKnowledge = (path = 'knowledge.toml') => {
   const file = readFileSync(path, 'utf8');
@@ -30,15 +32,21 @@ const main = async () => {
   const ai = new AIService();
   const db = new Database(config.sqlite.path);
 
-  db.db.prepare('delete from server_knowledge_embeddings where id in (select id from server_knowledge where discord_guild_id = ?)').run(discordGuildID);
-  db.db.prepare('delete from server_knowledge where discord_guild_id = ?').run(discordGuildID);
+  db.db
+    .prepare(
+      'delete from server_knowledge_embeddings where id in (select id from server_knowledge where discord_guild_id = ?)'
+    )
+    .run(discordGuildID);
+  db.db
+    .prepare('delete from server_knowledge where discord_guild_id = ?')
+    .run(discordGuildID);
 
-  const embeddings = await ai.getManyEmbedding(knowledgeFile.entry.map(e => e.content));
+  const embeddings = await ai.getManyEmbedding(
+    knowledgeFile.entry.map(e => e.content)
+  );
 
   for (let i = 0; i < embeddings.length; i++) {
     const k = knowledgeFile.entry[i];
-
-
     db.insertKnowledge({
       content: k.content,
       category: k.category,
@@ -46,7 +54,7 @@ const main = async () => {
       embedding: embeddings[i],
     });
 
-    console.log(`[${i+1}/${embeddings.length}] Inserted ${k.category} item`);
+    console.log(`[${i + 1}/${embeddings.length}] Inserted ${k.category} item`);
   }
 };
 

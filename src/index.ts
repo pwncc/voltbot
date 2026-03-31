@@ -119,15 +119,16 @@ discord.on('messageCreate', async msg => {
   } catch (err) {
     if (
       err !== 'parent_message_deleted' &&
-      !(err &&
+      !(
+        err &&
         typeof err === 'object' &&
         'cause' in err &&
-        err.cause === 'parent_message_deleted')
+        err.cause === 'parent_message_deleted'
+      )
     ) {
       console.error(err);
       msg.channel.send(':x: An error occurred.');
     }
-
   } finally {
     clearInterval(typingInterval);
   }
@@ -142,6 +143,22 @@ discord.on('messageDelete', msg => {
     }
 
     ai.sending.delete(msg.id);
+  }
+});
+
+discord.on('messageUpdate', async msg => {
+  if (msg.author?.bot) {
+    return;
+  }
+
+  if (!db.isInConvo) {
+    return;
+  }
+
+  const m = await msg.fetch(false);
+
+  if (m.content) {
+    db.updateMessage(BigInt(msg.id), m.content);
   }
 });
 

@@ -160,7 +160,13 @@ export class AIService {
       stopWhen: [
         stepCountIs(10),
         ({steps}) =>
-          steps.reduce((a, c) => (c.usage.totalTokens || 0) + a, 0) > 20_000,
+          steps.reduce(
+            (a, c) =>
+              (c.usage.inputTokenDetails.noCacheTokens ||
+                c.usage.totalTokens ||
+                0) + a,
+            0
+          ) > 20_000,
         ({steps}) =>
           steps.reduce(
             (a, c) =>

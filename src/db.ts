@@ -36,6 +36,7 @@ export class Database {
 
   queries!: {
     insertMessage: StatementSync;
+    updateMessage: StatementSync;
     isInConvo: StatementSync;
     getConversation: StatementSync;
     deleteChildren: StatementSync;
@@ -77,9 +78,14 @@ export class Database {
     );
   }
 
+  updateMessage(msgID: bigint, content: string) {
+    this.queries.updateMessage.run(content, msgID);
+  }
+
   isInConvo(msgID: bigint): boolean {
     const fromCache = this.#isInConvoCache.get(msgID);
     if (fromCache !== undefined) {
+      console.log({fromCache});
       return fromCache;
     }
 
@@ -161,6 +167,12 @@ export class Database {
           nickname
         )
         values (?, ?, ?, ?, ?, ?, ?, ?, ?);
+      `),
+
+      updateMessage: this.db.prepare(`
+        update messages
+        set content = ?
+        where id = ?
       `),
 
       isInConvo: this.db.prepare(`

@@ -1,4 +1,4 @@
-import {ActivityType, Client, GatewayIntentBits} from 'discord.js';
+import {ActivityType, Client, GatewayIntentBits, Partials} from 'discord.js';
 
 export class DiscordClient extends Client {
   constructor() {
@@ -17,6 +17,8 @@ export class DiscordClient extends Client {
           },
         ],
       },
+
+      partials: [Partials.Message],
     });
   }
 }
