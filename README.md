@@ -32,7 +32,7 @@ Web search is provided by SearXNG. Because it's not a web scraper, it only retur
 # Running it
 ```sh
 $ pnpm build
-$ DATABASE_URL=sqlite:./db.db dbmate up
+$ DATABASE_URL=sqlite:./db/mira.sqlite3 dbmate up
 $ pnpm mira:update-rag
 $ pnpm mira:start
 ```
