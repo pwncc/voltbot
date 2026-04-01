@@ -138,8 +138,8 @@ discord.on('messageCreate', async msg => {
             content: text,
             flags: MessageFlags.SuppressEmbeds,
             allowedMentions: {
-              parse: [],
-              repliedUser: false,
+              parse: ['users'],
+              repliedUser: true,
             },
           });
         }

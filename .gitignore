@@ -8,3 +8,4 @@ config.toml
 *.sqlite
 knowledge.toml
 /src/test.ts
+*.toml

@@ -142,7 +142,7 @@ export class Database {
 
   insertKnowledge(kn: Omit<DBRAGKnowledge, 'id'> & {embedding: number[]}) {
     const textRow = this.queries.insertRagKnowledge.run(
-      kn.content,
+      kn.content.trim(),
       kn.discord_guild_id,
       kn.category
     );
@@ -227,6 +227,7 @@ export class Database {
         inner join knn_matches
         using (id)
         where sk.discord_guild_id = ?
+          or sk.discord_guild_id = 0
       `),
 
       insertRagKnowledge: this.db.prepare(`

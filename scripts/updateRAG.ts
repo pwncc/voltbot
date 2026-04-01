@@ -1,4 +1,5 @@
-import {readFileSync} from 'node:fs';
+import {readdirSync, readFileSync} from 'node:fs';
+import path from 'node:path';
 
 import {parse} from 'toml';
 
@@ -19,42 +20,60 @@ type RAGEntry = {
 const loadKnowledge = (path = 'knowledge.toml') => {
   const file = readFileSync(path, 'utf8');
   const knowledge = parse(file) as RAGConfig;
-
   return knowledge;
 };
 
 const main = async () => {
-  const knowledgeFile = loadKnowledge('./knowledge.toml');
-  const config = loadConfig('./config.toml');
+  const files = readdirSync('./knowledge', {withFileTypes: true});
+  const tomlFiles = files.filter(f => f.isFile() && f.name.endsWith('.toml'));
 
-  const discordGuildID = BigInt(knowledgeFile.discord_guild_id);
+  for (const file of tomlFiles) {
+    const knowledgeFile = loadKnowledge(path.join(file.parentPath, file.name));
+    const config = loadConfig('./config.toml');
 
-  const ai = new AIService();
-  const db = new Database(config.sqlite.path);
+    const id =
+      /^(\d+)\.toml/.exec(file.name)?.[1] ||
+      knowledgeFile.discord_guild_id ||
+      '0';
+    if (!id) {
+      console.error(
+        'Cannot find guild ID for knowledge file:',
+        file.name,
+        'inserting as global knowledge'
+      );
+    }
 
-  db.db
-    .prepare(
-      'delete from server_knowledge_embeddings where id in (select id from server_knowledge where discord_guild_id = ?)'
-    )
-    .run(discordGuildID);
-  db.db
-    .prepare('delete from server_knowledge where discord_guild_id = ?')
-    .run(discordGuildID);
+    const discordGuildID = BigInt(id);
 
-  const embeddings = await ai.getManyEmbedding(
-    knowledgeFile.entry.map(e => e.content)
-  );
+    const ai = new AIService();
+    const db = new Database(config.sqlite.path);
 
-  for (let i = 0; i < embeddings.length; i++) {
-    const k = knowledgeFile.entry[i];
-    db.insertKnowledge({
-      content: k.content,
-      category: k.category,
-      discord_guild_id: discordGuildID,
-      embedding: embeddings[i],
-    });
+    db.db
+      .prepare(
+        'delete from server_knowledge_embeddings where id in (select id from server_knowledge where discord_guild_id = ?)'
+      )
+      .run(discordGuildID);
+    db.db
+      .prepare('delete from server_knowledge where discord_guild_id = ?')
+      .run(discordGuildID);
 
-    console.log(`[${i + 1}/${embeddings.length}] Inserted ${k.category} item`);
+    const embeddings = await ai.getManyEmbedding(
+      knowledgeFile.entry.map(e => e.content)
+    );
+
+    for (let i = 0; i < embeddings.length; i++) {
+      const k = knowledgeFile.entry[i];
+      db.insertKnowledge({
+        content: k.content,
+        category: k.category,
+        discord_guild_id: discordGuildID,
+        embedding: embeddings[i],
+      });
+
+      console.log(
+        `[${i + 1}/${embeddings.length}] Inserted ${k.category} item`
+      );
+    }
   }
 };
 
