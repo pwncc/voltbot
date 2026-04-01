@@ -14,14 +14,6 @@ CREATE TABLE server_knowledge (
   discord_guild_id integer not null,
   category text not null
 );
-CREATE VIRTUAL TABLE server_knowledge_embeddings using vec0(
-  id integer primary key, -- matches up with server_knowledge.id
-  embedding float[4096]
-);
-CREATE TABLE "server_knowledge_embeddings_info" (key text primary key, value any);
-CREATE TABLE "server_knowledge_embeddings_chunks"(chunk_id INTEGER PRIMARY KEY AUTOINCREMENT,size INTEGER NOT NULL,validity BLOB NOT NULL,rowids BLOB NOT NULL);
-CREATE TABLE "server_knowledge_embeddings_rowids"(rowid INTEGER PRIMARY KEY AUTOINCREMENT,id,chunk_id INTEGER,chunk_offset INTEGER);
-CREATE TABLE "server_knowledge_embeddings_vector_chunks00"(rowid PRIMARY KEY,vectors BLOB NOT NULL);
 -- Dbmate schema migrations
 INSERT INTO "schema_migrations" (version) VALUES
   ('20260323154300'),

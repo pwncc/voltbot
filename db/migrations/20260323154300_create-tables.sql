@@ -9,7 +9,5 @@ create table messages (
   image_url text
 );
 
--- TODO: threads
-
 -- migrate:down
 drop table messages;

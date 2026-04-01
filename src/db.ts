@@ -29,6 +29,13 @@ export type DBVecMetadata = {
   distance: number;
 };
 
+const DB_MIGRATIONS = [
+  `create virtual table if not exists server_knowledge_embeddings using vec0(
+      id integer primary key references server_knowledge(id) on delete cascade,
+      embedding float[4096]
+    )`.trim(),
+];
+
 export class Database {
   db: DatabaseSync;
 
@@ -49,8 +56,10 @@ export class Database {
     this.db = new DatabaseSync(dbPath, {
       readBigInts: true,
       allowExtension: true,
+      enableForeignKeyConstraints: true,
     });
     sqliteVec.load(this.db);
+    this.initDb();
     this.initQueries();
   }
 
@@ -150,6 +159,13 @@ export class Database {
       textRow.lastInsertRowid,
       JSON.stringify(kn.embedding)
     );
+  }
+
+  initDb() {
+    this.db.exec('pragma foreign_keys = on;');
+    for (const migration of DB_MIGRATIONS) {
+      this.db.exec(migration);
+    }
   }
 
   initQueries() {
