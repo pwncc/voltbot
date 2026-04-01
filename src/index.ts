@@ -73,7 +73,7 @@ discord.on('messageCreate', async msg => {
 
   try {
     let sent: Message | undefined;
-    const resp = ai.genText({
+    const resp = ai.streamText({
       messages: convo,
       context: {
         replyingToMsgID: msg.id,
