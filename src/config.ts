@@ -4,12 +4,13 @@ import {readFileSync} from 'node:fs';
 import {parse} from 'toml';
 
 export type ModelConfig = {
-  name: string;
+  primary_model: string;
+  small_model?: string;
+  multimodal_model?: string;
+  router_model?: string;
   provider?: string[];
   max_history?: number;
   max_output?: number;
-  small_model?: string;
-  image_model?: string;
 };
 
 export type ProviderConfig = {

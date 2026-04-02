@@ -86,7 +86,7 @@ system_prompt = "You are a helpful assistant."
 
 [model]
 # the name of the primary model to use for text chats
-name = ""
+primary_model = ""
 # optional: openrouter provider `order`
 provider = []
 # max number of messages in a conversation. if a thread exceeds this number, the oldest messages are removed
@@ -94,7 +94,11 @@ max_history = 20
 # max output tokens
 max_output = 8000
 # optional: a different model to use when images are uploaded since not all models are multimodal. falls back to primary model if unset
-image_model = ""
+multimodal_model = ""
+# optional: for routing mutliple models (simple questions -> small, hard questions -> primary)
+router_model = ""
+# optional:
+small_model = ""
 
 [rag]
 # the model to use for word embeddings for the RAG tool

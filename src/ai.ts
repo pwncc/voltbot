@@ -4,6 +4,7 @@ import {
   embedMany,
   generateText,
   type ModelMessage,
+  Output,
   type SystemModelMessage,
   stepCountIs,
   streamText,
@@ -98,9 +99,9 @@ export class AIService {
     );
 
     const modelName =
-      hasImage && config.model.image_model
-        ? config.model.image_model
-        : config.model.name;
+      hasImage && config.model.multimodal_model
+        ? config.model.multimodal_model
+        : await this.routePrompt(messages);
 
     const systemPrompt = this.systemPrompt
       .replaceAll('{{BOT_USERNAME}}', context.botUsername)
@@ -156,6 +157,10 @@ export class AIService {
         ...discordMessageTools(context.member),
         ...ragTools(context.member, context.db, this),
       },
+      timeout: {
+        totalMs: 90_000,
+        stepMs: 45_000,
+      },
       stopWhen: [
         stepCountIs(20),
         ({steps}) =>
@@ -174,8 +179,10 @@ export class AIService {
             0
           ) > 0.015,
       ],
-      temperature: 0.9,
+      // temperature: 0.9,
       topP: 0.93,
+      temperature: 1.1,
+      frequencyPenalty: 0.1,
     });
 
     sendingSet.delete(ac);
@@ -194,6 +201,10 @@ export class AIService {
 
     const keepStates = new Set(['reasoning-delta', 'text-delta', 'tool-call']);
     for await (const part of llmResult.fullStream) {
+      if (part.type === 'finish') {
+        console.log('finished because:', part.finishReason);
+      }
+
       if (!keepStates.has(part.type)) {
         continue;
       }
@@ -296,38 +307,37 @@ export class AIService {
     };
   }
 
-  async generateTitle(messages: ModelMessage[]): Promise<string> {
-    const modelName = config.model.small_model || config.model.name;
-
-    const titlePrompt = `Generate a short, descriptive title for this conversation. Max 100 characters.`;
-
-    try {
-      const result = await generateText({
-        model: (this.isLocal ? this.ollama : this.openrouter)(modelName, {}),
-        system: titlePrompt,
-        messages: messages.slice(-10),
-        maxOutputTokens: 20,
-        providerOptions: {
-          openrouter: {
-            reasoning: {
-              enabled: false,
-            },
-          },
-        },
-      });
-
-      return result.text.slice(0, 100).trim() || 'AI Response';
-    } catch (err) {
-      console.error('Failed to generate thread title:', err);
-      return 'AI Response';
-    }
-  }
+  // async generateTitle(messages: ModelMessage[]): Promise<string> {
+  //   const modelName = config.model.small_model || config.model.name;
+  //
+  //   const titlePrompt = `Generate a short, descriptive title for this conversation. Max 100 characters.`;
+  //
+  //   try {
+  //     const result = await generateText({
+  //       model: (this.isLocal ? this.ollama : this.openrouter)(modelName, {}),
+  //       system: titlePrompt,
+  //       messages: messages.slice(-10),
+  //       maxOutputTokens: 20,
+  //       providerOptions: {
+  //         openrouter: {
+  //           reasoning: {
+  //             enabled: false,
+  //           },
+  //         },
+  //       },
+  //     });
+  //
+  //     return result.text.slice(0, 100).trim() || 'AI Response';
+  //   } catch (err) {
+  //     console.error('Failed to generate thread title:', err);
+  //     return 'AI Response';
+  //   }
+  // }
 
   async getEmbedding(query: string): Promise<number[]> {
     const {embedding} = await embed({
-      model: (this.isLocal ? this.ollama : this.openrouter).embedding(
-        config.rag.embedding_model,
-        {}
+      model: (this.isLocal ? this.ollama : this.openrouter).embeddingModel(
+        config.rag.embedding_model
       ),
       value: query,
     });
@@ -337,13 +347,58 @@ export class AIService {
 
   async getManyEmbedding(queries: string[]): Promise<number[][]> {
     const {embeddings} = await embedMany({
-      model: (this.isLocal ? this.ollama : this.openrouter).embedding(
-        config.rag.embedding_model,
-        {}
+      model: (this.isLocal ? this.ollama : this.openrouter).embeddingModel(
+        config.rag.embedding_model
       ),
       values: queries,
     });
 
     return embeddings;
+  }
+
+  async routePrompt(messages: DBMessage[]) {
+    if (
+      !config.model.small_model ||
+      !config.model.router_model ||
+      config.model.primary_model === config.model.small_model
+    ) {
+      return config.model.primary_model;
+    }
+    try {
+      const out = await generateText({
+        model: (this.isLocal ? this.ollama : this.openrouter)(
+          config.model.router_model
+        ),
+        providerOptions: {
+          openrouter: {
+            reasoning: {
+              enabled: false,
+            },
+          },
+        },
+        system: `You are a prompt classification engine. Analyze the user's request.
+If the request is a simple greeting, casual chat, roleplay, or a meaningless message, output exactly 'easy'
+Otherwise output exactly 'hard'`,
+        messages,
+        output: Output.choice({
+          options: ['hard', 'easy'],
+        }),
+        stopWhen: stepCountIs(1),
+        timeout: 1_000,
+      });
+
+      switch (out.output) {
+        case 'hard': {
+          return config.model.primary_model;
+        }
+
+        default: {
+          return config.model.small_model || config.model.primary_model;
+        }
+      }
+    } catch (err) {
+      console.error('Failed to route prompt:', err);
+      return config.model.primary_model;
+    }
   }
 }
