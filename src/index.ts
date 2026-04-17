@@ -95,7 +95,9 @@ discord.on('messageCreate', async msg => {
       return;
     }
 
-    const isReplyInConvo = db.isInConvo(BigInt(msg.reference!.messageId!));
+    const isReplyInConvo =
+      !!msg.reference?.messageId &&
+      db.isInConvo(BigInt(msg.reference!.messageId!));
 
     if (isPing && isReplyToOther && !isReplyToBot) {
       const repliedMsg = await msg.fetchReference();
