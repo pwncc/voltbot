@@ -16,13 +16,17 @@ model_volume = Volume.from_name(
 
 app = App(name="mira-transcribe")
 
-image = Image.debian_slim(python_version="3.12").uv_pip_install(
-    "faster-whisper==1.2.1",
-    "librosa==0.11.0",
-    "pydantic==2.13.1",
-    "fastapi[standard]",
-    "nvidia-cublas-cu12",
-    "nvidia-cudnn-cu12",
+image = (
+    Image.debian_slim(python_version="3.12")
+    .apt_install("ffmpeg")
+    .uv_pip_install(
+        "faster-whisper==1.2.1",
+        "librosa==0.11.0",
+        "pydantic==2.13.1",
+        "fastapi[standard]",
+        "nvidia-cublas-cu12",
+        "nvidia-cudnn-cu12",
+    )
 )
 
 mt_secret = Secret.from_name("mt-api")
@@ -32,6 +36,7 @@ auth_scheme = HTTPBearer()
 
 class TranscriptionRequest(BaseModel):
     url: str
+
 
 class TranscriptionResponse(BaseModel):
     text: str
