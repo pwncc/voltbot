@@ -7,6 +7,7 @@ Another Discord-based LLM chatbot.
 - Reply chain conversation history
 - Image input
 - Basic web search (searxng)
+- Voice message transcription
 
 ## Usage
 To start a new thread, mention the bot with a prompt. Reply to the bot to continue the conversation, or ping it again to start a new thread. Replying to another user's message and pinging the bot will insert the replied-to message into the conversation.
@@ -55,6 +56,15 @@ $ pnpm mira:start
 $ docker compose up -d searxng
 $ docker compose run --rm mira mira:update-rag
 $ docker compose up -d
+```
+
+### Voice Transcription Service
+The voice transcription model runs on [Modal](https://modal.com).
+```sh
+$ cd whisper
+$ modal run main.py::download_model
+$ modal secret create mt-api API_KEY=random-string-here
+$ modal deploy main.py
 ```
 
 ## Configuration
@@ -109,6 +119,12 @@ embedding_model = ""
 searxng_url = ""
 # api key for https://jina.ai
 jina_api_key = ""
+
+[transcription]
+# modal endpoint
+endpoint = ""
+# bearer token
+api_key = ""
 ```
 
 `./knowledge/<server_id>.toml`

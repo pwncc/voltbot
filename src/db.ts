@@ -29,6 +29,14 @@ export type DBVecMetadata = {
   distance: number;
 };
 
+export type DBTranscription = {
+  id: bigint;
+  text: string;
+  discord_author_id: bigint;
+  voice_message_id: bigint;
+  transcription_message_id: bigint;
+};
+
 const DB_MIGRATIONS = [
   `create virtual table if not exists server_knowledge_embeddings using vec0(
       id integer primary key references server_knowledge(id) on delete cascade,
@@ -50,6 +58,9 @@ export class Database {
     queryRag: StatementSync;
     insertRagKnowledge: StatementSync;
     insertRagEmbedding: StatementSync;
+    insertTranscription: StatementSync;
+    deleteTranscription: StatementSync;
+    getTranscription: StatementSync;
   };
 
   constructor(dbPath: string) {
@@ -161,6 +172,28 @@ export class Database {
     );
   }
 
+  insertTranscription(
+    messageID: bigint,
+    text: string,
+    authorID: bigint,
+    tMessageID: bigint
+  ) {
+    this.queries.insertTranscription.run(messageID, text, authorID, tMessageID);
+  }
+
+  deleteTranscription(messageID: bigint) {
+    return this.queries.deleteTranscription.all(messageID) as Pick<
+      DBTranscription,
+      'transcription_message_id'
+    >[];
+  }
+
+  getTranscription(messageID: string) {
+    return this.queries.getTranscription.get(
+      messageID
+    ) as DBTranscription | null;
+  }
+
   initDb() {
     this.db.exec('pragma foreign_keys = on;');
     for (const migration of DB_MIGRATIONS) {
@@ -254,6 +287,23 @@ export class Database {
       insertRagEmbedding: this.db.prepare(`
         insert into server_knowledge_embeddings (id, embedding)
         values (?, ?)
+      `),
+
+      insertTranscription: this.db.prepare(`
+        insert into transcriptions (voice_message_id, text, discord_author_id, transcription_message_id)
+        values (?, ?, ?, ?)
+      `),
+
+      deleteTranscription: this.db.prepare(`
+        delete from transcriptions
+        where voice_message_id = ?
+        returning transcription_message_id
+      `),
+
+      getTranscription: this.db.prepare(`
+        select *
+        from transcriptions
+        where voice_message_id = ?
       `),
     };
   }

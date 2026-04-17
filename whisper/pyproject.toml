@@ -9,6 +9,7 @@ dependencies = [
     "faster-whisper==1.2.1",
     "librosa>=0.11.0",
     "modal>=1.4.1",
+    "openai-whisper>=20250625",
     "pydantic>=2.13.1",
     "requests>=2.33.1",
 ]

@@ -5,6 +5,7 @@ import {
   cleanContent,
   type Message,
   MessageFlags,
+  Routes,
   type TextChannel,
 } from 'discord.js';
 
@@ -12,6 +13,8 @@ import {AIService} from './ai';
 import {DiscordClient} from './client';
 import {isGuildEnabled, loadConfig} from './config';
 import {Database} from './db';
+import {transcribe} from './transcribe';
+import {audioAttachments, hasAudioAttachment} from './util/attachments';
 import {sendMessage} from './util/message';
 
 const config = loadConfig('./config.toml');
@@ -40,14 +43,62 @@ discord.on('messageCreate', async msg => {
   const isReplyToOther = !!msg.reference?.messageId && !isReplyToBot;
 
   if (!isPing && !isReplyToBot) {
+    if (!msg.flags.has(MessageFlags.IsVoiceMessage)) {
+      return;
+    }
+
+    console.log(msg.attachments.first()!.url);
+
+    const [reply, transcribed] = await Promise.allSettled([
+      msg.reply({
+        content: '-# transcribing...',
+        allowedMentions: {
+          parse: [],
+          repliedUser: false,
+        },
+      }),
+      transcribe(msg.attachments.first()!.url),
+    ]);
+
+    if (reply.status === 'rejected') {
+      return;
+    }
+
+    if (transcribed.status === 'rejected') {
+      console.error('Failed to transcribe message:', transcribed.reason);
+      reply.value.edit({
+        content: '-# :x: failed to transcribe message',
+        allowedMentions: {
+          parse: [],
+          repliedUser: false,
+        },
+      });
+
+      return;
+    }
+
+    reply.value.edit({
+      content: transcribed.value.text,
+      allowedMentions: {
+        parse: [],
+        repliedUser: false,
+      },
+    });
+
+    // TODO: insert this without text then update it?
+    db.insertTranscription(
+      BigInt(msg.id),
+      transcribed.value.text,
+      BigInt(msg.author.id),
+      BigInt(reply.value.id)
+    );
+
     return;
   }
 
-  if (
-    isPing &&
-    isReplyToOther &&
-    !db.isInConvo(BigInt(msg.reference!.messageId!))
-  ) {
+  const isReplyInConvo = db.isInConvo(BigInt(msg.reference!.messageId!));
+
+  if (isPing && isReplyToOther && !isReplyToBot) {
     const repliedMsg = await msg.fetchReference();
     db.insertDiscordMessage(repliedMsg);
   }
@@ -57,7 +108,10 @@ discord.on('messageCreate', async msg => {
     msg.channel
   ).trim();
 
-  if (!content && !isReplyToBot && !isReplyToOther) {
+  if (
+    (!content && !isReplyToBot && !isReplyToOther) ||
+    (isReplyToBot && !isReplyInConvo)
+  ) {
     return;
   }
 
@@ -204,6 +258,20 @@ discord.on('messageDelete', msg => {
 
     ai.sending.delete(msg.id);
   }
+
+  // TODO: maybe check db if the message isn't cached?
+  if (hasAudioAttachment(msg)) {
+    const deleted = db.deleteTranscription(BigInt(msg.id));
+
+    for (const d of deleted) {
+      msg.client.rest.delete(
+        Routes.channelMessage(
+          msg.channel.id,
+          d.transcription_message_id.toString()
+        )
+      );
+    }
+  }
 });
 
 discord.on('messageUpdate', async msg => {
@@ -219,6 +287,56 @@ discord.on('messageUpdate', async msg => {
 
   if (m.content) {
     db.updateMessage(BigInt(msg.id), m.content);
+  }
+});
+
+discord.on('interactionCreate', async i => {
+  if (i.isMessageContextMenuCommand()) {
+    if (i.commandName === 'Transcribe') {
+      // TODO: what should happen if there's more than one?
+      const attachment = audioAttachments(i.targetMessage)[0];
+      if (!attachment) {
+        await i.reply({
+          content: ':x: nothing to transcribe!',
+          allowedMentions: {
+            repliedUser: false,
+          },
+          flags: MessageFlags.Ephemeral,
+        });
+
+        return;
+      }
+
+      const rep = i.deferReply();
+      const vmURL = attachment.url;
+
+      try {
+        const transcription = await transcribe(vmURL);
+        i.editReply({
+          content: transcription.text,
+          allowedMentions: {
+            repliedUser: false,
+          },
+        });
+
+        db.insertTranscription(
+          BigInt(i.targetMessage.id),
+          transcription.text,
+          BigInt(i.targetMessage.author.id),
+          BigInt((await rep).id)
+        );
+      } catch (err) {
+        console.error('failed to transcribe voice message in dm:', err);
+        i.editReply({
+          content: '-# :x: failed to transcribe message',
+          allowedMentions: {
+            repliedUser: false,
+          },
+        });
+      }
+
+      return;
+    }
   }
 });
 

@@ -41,6 +41,11 @@ export type MiscConfig = {
   debug_show_tokens: boolean;
 };
 
+export type TranscriptionConfig = {
+  endpoint: string;
+  api_key: string;
+};
+
 export type Config = {
   discord: DiscordConfig;
   provider: ProviderConfig;
@@ -49,13 +54,14 @@ export type Config = {
   sqlite: SQLiteConfig;
   rag: RAGConfig;
   misc: MiscConfig;
+  transcription: TranscriptionConfig;
 };
 
 export let config: Config;
 export let watcher: StatWatcher | undefined;
 
-export const loadConfig = (path = 'config.toml') => {
-  if (!watcher) {
+export const loadConfig = (path = 'config.toml', watch = true) => {
+  if (!watcher && watch) {
     watcher = watchFile(path, () => {
       console.log('Config file changed, reloading...');
       loadConfig(path);

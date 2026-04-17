@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 MAX_FILE_SIZE = 5e7  # 50mb
-IDLE_TIMEOUT = 2 * 60  # 2 minutes
+IDLE_TIMEOUT = 4 * 60  # 4 minutes
 
 WHISPER_MODEL = "large-v3-turbo"
 MODEL_DIR = "/models"
@@ -32,6 +32,10 @@ auth_scheme = HTTPBearer()
 
 class TranscriptionRequest(BaseModel):
     url: str
+
+class TranscriptionResponse(BaseModel):
+    text: str
+    lang: str
 
 
 @app.local_entrypoint()
@@ -62,6 +66,8 @@ def download_model():
     volumes={MODEL_DIR: model_volume},
     scaledown_window=IDLE_TIMEOUT,
     secrets=[mt_secret],
+    enable_memory_snapshot=True,
+    experimental_options={"enable_gpu_snapshot": True},
     env={
         "LD_LIBRARY_PATH": ":".join(
             [
@@ -72,7 +78,7 @@ def download_model():
     },
 )
 class Transcriber:
-    @enter()
+    @enter(snap=True)
     def load_model(self):
         from faster_whisper import WhisperModel
 
@@ -81,6 +87,7 @@ class Transcriber:
             local_files_only=True,
             download_root=MODEL_DIR,
             compute_type="float16",
+            device="cuda",
         )
 
     @fastapi_endpoint(method="POST")
@@ -88,13 +95,10 @@ class Transcriber:
         self,
         body: TranscriptionRequest,
         token: HTTPAuthorizationCredentials = Depends(auth_scheme),
-    ):
-        import io
+    ) -> TranscriptionResponse:
         import os
-        import librosa
         import requests
         from fastapi import HTTPException
-        from fastapi.responses import StreamingResponse
 
         if token.credentials != os.environ["API_KEY"]:
             raise HTTPException(
@@ -113,24 +117,17 @@ class Transcriber:
             raise HTTPException(status_code=400)
 
         res = requests.get(body.url)
-
-        audio_data, _ = librosa.load(io.BytesIO(res.content), sr=16000)
-        segments, _ = self.model.transcribe(audio_data)
-
-        return StreamingResponse(
-            map(lambda s: s.text, segments),
-            media_type="text/event-stream",
-        )
+        return self.transcribe.local(res.content)
 
     @method()
-    def transcribe(self, audio_bytes: bytes):
+    def transcribe(self, audio_bytes: bytes) -> TranscriptionResponse:
         import io
         import librosa
 
         audio_data, _ = librosa.load(io.BytesIO(audio_bytes), sr=16000)
         segments, info = self.model.transcribe(audio_data)
 
-        return {
-            "text": "".join(map(lambda s: s.text, segments)).strip(),
-            "lang": info.language,
-        }
+        return TranscriptionResponse(
+            text="".join(map(lambda s: s.text, segments)).strip(),
+            lang=info.language,
+        )
