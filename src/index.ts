@@ -14,7 +14,7 @@ import {DiscordClient} from './client';
 import {isGuildEnabled, loadConfig} from './config';
 import {Database} from './db';
 import {transcribe} from './transcribe';
-import {audioAttachments, hasAudioAttachment} from './util/attachments';
+import {getAudioAttachments, hasAudioAttachment} from './util/attachments';
 import {sendMessage} from './util/message';
 
 const config = loadConfig('./config.toml');
@@ -305,7 +305,7 @@ discord.on('interactionCreate', async i => {
     if (i.isMessageContextMenuCommand()) {
       if (i.commandName === 'Transcribe') {
         // TODO: what should happen if there's more than one?
-        const attachment = audioAttachments(i.targetMessage)[0];
+        const attachment = getAudioAttachments(i.targetMessage)[0];
         if (!attachment) {
           await i.reply({
             content: ':x: nothing to transcribe!',

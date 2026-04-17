@@ -6,7 +6,7 @@ export const hasAudioAttachment = (
   msg.flags.has(MessageFlags.IsVoiceMessage) ||
   msg.attachments.some(a => a.contentType?.startsWith('audio/'));
 
-export const audioAttachments = (
+export const getAudioAttachments = (
   msg: Pick<Message, 'flags' | 'attachments'>
 ) => [
   ...msg.attachments.filter(a => a.contentType?.startsWith('audio/')).values(),
