@@ -1,5 +1,6 @@
 import {
   ApplicationCommandType,
+  ApplicationIntegrationType,
   InteractionContextType,
   REST,
   type RESTPutAPIApplicationCommandsJSONBody,
@@ -16,6 +17,10 @@ const CMDS: RESTPutAPIApplicationCommandsJSONBody = [
       InteractionContextType.Guild,
       InteractionContextType.BotDM,
       InteractionContextType.PrivateChannel,
+    ],
+    integration_types: [
+      ApplicationIntegrationType.GuildInstall,
+      ApplicationIntegrationType.UserInstall,
     ],
   },
 ];
