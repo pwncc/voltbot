@@ -62,9 +62,10 @@ $ docker compose up -d
 The voice transcription model runs on [Modal](https://modal.com).
 ```sh
 $ cd whisper
-$ modal run main.py::download_model
-$ modal secret create mt-api API_KEY=random-string-here
-$ modal deploy main.py
+$ uv sync
+$ uv run modal run main.py::download_model
+$ uv run modal secret create mt-api API_KEY=random-string-here
+$ uv run modal deploy main.py
 ```
 
 ## Configuration
