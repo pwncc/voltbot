@@ -29,7 +29,6 @@ const main = async () => {
     config.discord.token.split('.')[0],
     'base64'
   ).toString();
-  console.log(appID);
 
   const out = await rest.put(Routes.applicationCommands(appID), {
     body: CMDS,

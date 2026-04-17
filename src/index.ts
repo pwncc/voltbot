@@ -47,8 +47,6 @@ discord.on('messageCreate', async msg => {
       return;
     }
 
-    console.log(msg.attachments.first()!.url);
-
     const [reply, transcribed] = await Promise.allSettled([
       msg.reply({
         content: '-# transcribing...',
