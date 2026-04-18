@@ -336,7 +336,7 @@ export class AIService {
 
   async getEmbedding(query: string): Promise<number[]> {
     const {embedding} = await embed({
-      model: (this.isLocal ? this.ollama : this.openrouter).embeddingModel(
+      model: (this.isLocal ? this.ollama : this.openrouter).textEmbeddingModel(
         config.rag.embedding_model
       ),
       value: query,
@@ -347,7 +347,7 @@ export class AIService {
 
   async getManyEmbedding(queries: string[]): Promise<number[][]> {
     const {embeddings} = await embedMany({
-      model: (this.isLocal ? this.ollama : this.openrouter).embeddingModel(
+      model: (this.isLocal ? this.ollama : this.openrouter).textEmbeddingModel(
         config.rag.embedding_model
       ),
       values: queries,
