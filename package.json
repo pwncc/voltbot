@@ -9,7 +9,13 @@
     "fmt": "biome check . --write",
     "typecheck": "tsc --noEmit",
     "mira:start": "node --enable-source-maps .",
-    "mira:update-rag": "node --enable-source-maps ./build/scripts/updateRAG.js"
+    "mira:update-rag": "node --enable-source-maps ./build/scripts/updateRAG.js",
+    "sim:chat": "pnpm build && node --enable-source-maps ./build/scripts/simulateChat.js",
+    "sim:full": "pnpm build && node --enable-source-maps ./build/scripts/simulateFull.js",
+    "sim:inspect": "pnpm build && node --enable-source-maps ./build/scripts/inspectSim.js",
+    "testchat:replay": "pnpm build && node --enable-source-maps ./build/scripts/replayTestChat.js",
+    "testchat:memory-stress": "pnpm build && node --enable-source-maps ./build/scripts/stressMemories.js",
+    "testchat:memory-recall": "pnpm build && node --enable-source-maps ./build/scripts/testMemoryRecall.js"
   },
   "license": "MIT",
   "packageManager": "pnpm@10.30.3",

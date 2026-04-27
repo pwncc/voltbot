@@ -37,11 +37,79 @@ export type DBTranscription = {
   transcription_message_id: bigint;
 };
 
+export type DBMemory = {
+  id: number;
+  discord_guild_id: bigint;
+  discord_user_id: bigint | null;
+  kind: string;
+  content: string;
+  salience: number;
+  created_at: number;
+  last_seen_at: number;
+  source_message_id: bigint | null;
+};
+
+export type DBRelationship = {
+  discord_guild_id: bigint;
+  discord_user_id: bigint;
+  trust: number;
+  familiarity: number;
+  affinity: number;
+  tone: string | null;
+  notes: string | null;
+  updated_at: number;
+};
+
+export type DBMemoryChat = {
+  id: number;
+  discord_guild_id: bigint;
+  discord_user_id: bigint | null;
+  source_message_id: bigint;
+  created_at: number;
+  title: string;
+  transcript: string;
+};
+
 const DB_MIGRATIONS = [
   `create virtual table if not exists server_knowledge_embeddings using vec0(
       id integer primary key references server_knowledge(id) on delete cascade,
       embedding float[4096]
     )`.trim(),
+  `create table if not exists memories (
+      id integer primary key,
+      discord_guild_id integer not null,
+      discord_user_id integer,
+      kind text not null,
+      content text not null,
+      salience integer not null default 3,
+      created_at integer not null default (unixepoch()),
+      last_seen_at integer not null default (unixepoch()),
+      source_message_id integer
+    )`.trim(),
+  `create index if not exists idx_memories_lookup
+    on memories(discord_guild_id, discord_user_id, salience, last_seen_at)`.trim(),
+  `create table if not exists relationships (
+      discord_guild_id integer not null,
+      discord_user_id integer not null,
+      trust integer not null default 1,
+      familiarity integer not null default 1,
+      affinity integer not null default 0,
+      tone text,
+      notes text,
+      updated_at integer not null default (unixepoch()),
+      primary key (discord_guild_id, discord_user_id)
+    )`.trim(),
+  `create table if not exists memory_chats (
+      id integer primary key,
+      discord_guild_id integer not null,
+      discord_user_id integer,
+      source_message_id integer not null,
+      created_at integer not null default (unixepoch()),
+      title text not null,
+      transcript text not null
+    )`.trim(),
+  `create index if not exists idx_memory_chats_lookup
+    on memory_chats(discord_guild_id, discord_user_id, created_at)`.trim(),
 ];
 
 export class Database {
@@ -61,6 +129,13 @@ export class Database {
     insertTranscription: StatementSync;
     deleteTranscription: StatementSync;
     getTranscription: StatementSync;
+    insertMemory: StatementSync;
+    getMemoryContext: StatementSync;
+    getRelationship: StatementSync;
+    upsertRelationship: StatementSync;
+    insertMemoryChat: StatementSync;
+    searchMemoryChats: StatementSync;
+    fetchMemoryChat: StatementSync;
   };
 
   constructor(dbPath: string) {
@@ -124,7 +199,7 @@ export class Database {
     return deleted;
   }
 
-  insertDiscordMessage(msg: Message) {
+  insertDiscordMessage(msg: Message, parentOverride?: bigint | null) {
     const content = cleanContent(
       msg.content.replaceAll(
         new RegExp(`<@!?${msg.client.user!.id}>`, 'g'),
@@ -139,7 +214,10 @@ export class Database {
       content,
       discord_author_id: BigInt(msg.author.id),
       discord_guild_id: BigInt(msg.guildId!),
-      parent: BigInt(msg.reference?.messageId || 0) || null,
+      parent:
+        parentOverride !== undefined
+          ? parentOverride
+          : BigInt(msg.reference?.messageId || 0) || null,
       role: 'user',
       image_url: getImage(msg),
       username: msg.author.username || null,
@@ -192,6 +270,159 @@ export class Database {
     return this.queries.getTranscription.get(
       messageID
     ) as DBTranscription | null;
+  }
+
+  insertMemory(memory: {
+    discord_guild_id: bigint;
+    discord_user_id: bigint | null;
+    kind: string;
+    content: string;
+    salience: number;
+    source_message_id: bigint | null;
+  }) {
+    return this.queries.insertMemory.run(
+      memory.discord_guild_id,
+      memory.discord_user_id,
+      memory.kind,
+      memory.content,
+      memory.salience,
+      memory.source_message_id
+    );
+  }
+
+  getMemoryContext({
+    guildID,
+    userID,
+    limit,
+    maxChars,
+  }: {
+    guildID: bigint;
+    userID: bigint;
+    limit: number;
+    maxChars: number;
+  }) {
+    const rows = this.queries.getMemoryContext.all(
+      guildID,
+      userID,
+      limit
+    ) as DBMemory[];
+    const lines: string[] = [];
+    let used = 0;
+
+    for (const row of rows) {
+      const owner =
+        row.discord_user_id === null
+          ? 'server/bot'
+          : row.discord_user_id === userID
+            ? 'current user'
+            : `user ${row.discord_user_id}`;
+      const line = `- [${row.kind}; ${owner}; ${row.salience}/5] ${row.content}`;
+      const next = used ? used + line.length + 1 : line.length;
+      if (next > maxChars) {
+        break;
+      }
+      lines.push(line);
+      used = next;
+    }
+
+    return lines.length ? lines.join('\n') : null;
+  }
+
+  getRelationship(guildID: bigint, userID: bigint) {
+    return this.queries.getRelationship.get(
+      guildID,
+      userID
+    ) as DBRelationship | null;
+  }
+
+  upsertRelationship({
+    guildID,
+    userID,
+    trust,
+    familiarity,
+    affinity,
+    tone,
+    notes,
+  }: {
+    guildID: bigint;
+    userID: bigint;
+    trust: number;
+    familiarity: number;
+    affinity: number;
+    tone: string | null;
+    notes: string | null;
+  }) {
+    return this.queries.upsertRelationship.run(
+      guildID,
+      userID,
+      trust,
+      familiarity,
+      affinity,
+      tone,
+      notes
+    );
+  }
+
+  insertMemoryChat({
+    guildID,
+    userID,
+    sourceMessageID,
+    title,
+    transcript,
+  }: {
+    guildID: bigint;
+    userID: bigint | null;
+    sourceMessageID: bigint;
+    title: string;
+    transcript: string;
+  }) {
+    return this.queries.insertMemoryChat.run(
+      guildID,
+      userID,
+      sourceMessageID,
+      title.slice(0, 160),
+      transcript
+    );
+  }
+
+  searchMemoryChats({
+    guildID,
+    userID,
+    query,
+    limit,
+  }: {
+    guildID: bigint;
+    userID: bigint;
+    query: string;
+    limit: number;
+  }) {
+    const q = `%${query.toLowerCase()}%`;
+    return this.queries.searchMemoryChats.all(
+      guildID,
+      userID,
+      q,
+      q,
+      limit
+    ) as Pick<
+      DBMemoryChat,
+      'id' | 'created_at' | 'title' | 'source_message_id'
+    >[];
+  }
+
+  fetchMemoryChat({
+    guildID,
+    userID,
+    id,
+  }: {
+    guildID: bigint;
+    userID: bigint;
+    id: number;
+  }) {
+    return this.queries.fetchMemoryChat.get(
+      id,
+      guildID,
+      userID
+    ) as DBMemoryChat | null;
   }
 
   initDb() {
@@ -304,6 +535,84 @@ export class Database {
         select *
         from transcriptions
         where voice_message_id = ?
+      `),
+
+      insertMemory: this.db.prepare(`
+        insert into memories (
+          discord_guild_id,
+          discord_user_id,
+          kind,
+          content,
+          salience,
+          source_message_id
+        )
+        values (?, ?, ?, ?, ?, ?)
+      `),
+
+      getMemoryContext: this.db.prepare(`
+        select *
+        from memories
+        where discord_guild_id = ?
+          and (discord_user_id is null or discord_user_id = ?)
+        order by salience desc, last_seen_at desc, id desc
+        limit ?
+      `),
+
+      getRelationship: this.db.prepare(`
+        select *
+        from relationships
+        where discord_guild_id = ?
+          and discord_user_id = ?
+      `),
+
+      upsertRelationship: this.db.prepare(`
+        insert into relationships (
+          discord_guild_id,
+          discord_user_id,
+          trust,
+          familiarity,
+          affinity,
+          tone,
+          notes,
+          updated_at
+        )
+        values (?, ?, ?, ?, ?, ?, ?, unixepoch())
+        on conflict(discord_guild_id, discord_user_id) do update set
+          trust = excluded.trust,
+          familiarity = excluded.familiarity,
+          affinity = excluded.affinity,
+          tone = excluded.tone,
+          notes = excluded.notes,
+          updated_at = excluded.updated_at
+      `),
+
+      insertMemoryChat: this.db.prepare(`
+        insert into memory_chats (
+          discord_guild_id,
+          discord_user_id,
+          source_message_id,
+          title,
+          transcript
+        )
+        values (?, ?, ?, ?, ?)
+      `),
+
+      searchMemoryChats: this.db.prepare(`
+        select id, created_at, title, source_message_id
+        from memory_chats
+        where discord_guild_id = ?
+          and (discord_user_id is null or discord_user_id = ?)
+          and (lower(title) like ? or lower(transcript) like ?)
+        order by created_at desc
+        limit ?
+      `),
+
+      fetchMemoryChat: this.db.prepare(`
+        select *
+        from memory_chats
+        where id = ?
+          and discord_guild_id = ?
+          and (discord_user_id is null or discord_user_id = ?)
       `),
     };
   }

@@ -221,20 +221,18 @@ export const sendMessage = async ({
     };
 
     let msg: Message;
-    if (i === 0 && replyTo) {
-      if (firstMsg) {
-        msg = await firstMsg.edit({
-          content: msgOptions.content,
-          flags: MessageFlags.SuppressEmbeds,
-          allowedMentions: {
-            parse: ['users'],
-            repliedUser: true,
-          },
-          ...(hasFiles ? {files} : {}),
-        });
-      } else {
-        msg = await replyTo.reply(msgOptions);
-      }
+    if (i === 0 && firstMsg) {
+      msg = await firstMsg.edit({
+        content: msgOptions.content,
+        flags: MessageFlags.SuppressEmbeds,
+        allowedMentions: {
+          parse: ['users'],
+          repliedUser: true,
+        },
+        ...(hasFiles ? {files} : {}),
+      });
+    } else if (i === 0 && replyTo) {
+      msg = await replyTo.reply(msgOptions);
     } else {
       msg = await channel.send(msgOptions);
     }
